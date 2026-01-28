@@ -1,6 +1,6 @@
-import React, { useState, useRef, useMemo, useCallback } from 'react';
+import React, { useState, useRef, useMemo, useCallback, Suspense } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Mic, Wind, HelpCircle } from 'lucide-react';
+import { Mic, Wind, HelpCircle, ArrowRight } from 'lucide-react';
 import { Canvas, useFrame } from '@react-three/fiber';
 import { ContactShadows, Environment, Cylinder, Sparkles, Stars } from '@react-three/drei';
 import * as THREE from 'three';
@@ -301,18 +301,30 @@ const CakeModel = ({ isBlown, isLit, windVolume }: { isBlown: boolean, isLit: bo
 };
 
 
+// --- LOADER COMPONENT ---
+const CakeLoader = () => (
+  <div className="absolute inset-0 flex flex-col items-center justify-center z-50 pointer-events-none">
+    <div className="w-16 h-16 border-4 border-indigo-200 border-t-pink-400 rounded-full animate-spin mb-4" />
+    <span className="text-indigo-200 font-serif tracking-widest animate-pulse">Baking Cake...</span>
+  </div>
+);
+
+
 // --- MAIN REACT COMPONENT ---
 
 interface CakeProps {
   onCandlesBlown: () => void;
   name?: string;
+  initialBlown?: boolean;
 }
 
-export const Cake: React.FC<CakeProps> = ({ onCandlesBlown, name = "Someone Special" }) => {
-  const [candlesBlown, setCandlesBlown] = useState(false);
-  const [isLit, setIsLit] = useState(false);
+export const Cake: React.FC<CakeProps> = ({ onCandlesBlown, name = "Someone Special", initialBlown = false }) => {
+  const [candlesBlown, setCandlesBlown] = useState(initialBlown);
+  // If initially blown, we treat it as lit but extinguished (so components render but flame is out)
+  const [isLit, setIsLit] = useState(initialBlown);
   const [permissionGranted, setPermissionGranted] = useState(false);
   const [showHint, setShowHint] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   // Use useCallback to ensure the function reference is stable
   const handleBlow = useCallback(() => {
@@ -358,32 +370,42 @@ export const Cake: React.FC<CakeProps> = ({ onCandlesBlown, name = "Someone Spec
 
       {/* 3D Scene */}
       <div className="w-full flex-1 min-h-0 cursor-grab active:cursor-grabbing relative">
-        <Canvas shadows dpr={[1, 2]} camera={{ position: [0, 3, 6], fov: 45 }}>
+        {loading && <CakeLoader />}
+        
+        <Canvas 
+            shadows 
+            dpr={[1, 2]} 
+            camera={{ position: [0, 3, 6], fov: 45 }}
+            onCreated={() => setLoading(false)}
+        >
           <ambientLight intensity={0.4} />
           <spotLight position={[10, 10, 10]} angle={0.5} penumbra={1} intensity={1} castShadow />
           <Environment preset="night" />
           
-          <CakeModel 
-              isBlown={candlesBlown} 
-              isLit={isLit} 
-              windVolume={isListening ? volume : 0} 
-          />
+          <Suspense fallback={null}>
+            <CakeModel 
+                isBlown={candlesBlown} 
+                isLit={isLit} 
+                windVolume={isListening ? volume : 0} 
+            />
 
-          {/* Decorative Elements */}
-          <Stars radius={100} depth={50} count={5000} factor={4} saturation={0} fade speed={1} />
-          <Sparkles count={50} scale={6} size={2} speed={0.4} opacity={0.5} color="#FFF" />
-          
-          <Balloon position={[-2.2, 0.5, -2]} color="#F48FB1" delay={0} />
-          <Balloon position={[2.2, 1, -2]} color="#9FA8DA" delay={2} />
-          <Balloon position={[-2.8, 1.8, -3]} color="#CE93D8" delay={4} />
-          <Balloon position={[2.5, -0.5, -1.5]} color="#80CBC4" delay={1} />
+            {/* Decorative Elements */}
+            <Stars radius={100} depth={50} count={5000} factor={4} saturation={0} fade speed={1} />
+            <Sparkles count={50} scale={6} size={2} speed={0.4} opacity={0.5} color="#FFF" />
+            
+            <Balloon position={[-2.2, 0.5, -2]} color="#F48FB1" delay={0} />
+            <Balloon position={[2.2, 1, -2]} color="#9FA8DA" delay={2} />
+            <Balloon position={[-2.8, 1.8, -3]} color="#CE93D8" delay={4} />
+            <Balloon position={[2.5, -0.5, -1.5]} color="#80CBC4" delay={1} />
 
-          <ContactShadows position={[0, -1.6, 0]} opacity={0.4} scale={10} blur={2.5} far={4} />
+            <ContactShadows position={[0, -1.6, 0]} opacity={0.4} scale={10} blur={2.5} far={4} />
+          </Suspense>
         </Canvas>
       </div>
 
       {/* UI Overlay Controls */}
       <div className="w-full shrink-0 z-20 flex justify-center min-h-[80px]">
+        {/* State 1: Candles NOT blown yet */}
         {!candlesBlown && (
           <div className="text-center w-full max-w-sm">
             {!isLit ? (
@@ -442,7 +464,8 @@ export const Cake: React.FC<CakeProps> = ({ onCandlesBlown, name = "Someone Spec
           </div>
         )}
         
-        {candlesBlown && (
+        {/* State 2: Candles Blown (Just now) */}
+        {candlesBlown && !initialBlown && (
             <motion.div
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
@@ -450,6 +473,21 @@ export const Cake: React.FC<CakeProps> = ({ onCandlesBlown, name = "Someone Spec
             >
                 Making a wish...
             </motion.div>
+        )}
+
+        {/* State 3: Returned to screen after blowing previously */}
+        {candlesBlown && initialBlown && (
+            <motion.button
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={onCandlesBlown}
+                className="glass-btn px-6 py-3 rounded-full flex items-center justify-center gap-2 text-indigo-100 mx-auto border border-indigo-400/30 bg-indigo-900/30 backdrop-blur-md"
+            >
+                <span className="text-base font-light tracking-wide">Read Message</span>
+                <ArrowRight size={18} />
+            </motion.button>
         )}
       </div>
     </motion.div>

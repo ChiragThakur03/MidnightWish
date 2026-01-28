@@ -13,6 +13,7 @@ import { CONFETTI_CONFIG, MUSIC_URL } from './constants';
 export default function App() {
   const [phase, setPhase] = useState<AppPhase>(AppPhase.LOCKED);
   const [isMusicPlaying, setIsMusicPlaying] = useState(false);
+  const [hasBlownCandles, setHasBlownCandles] = useState(false); // New state to persist cake state
   const audioRef = useRef<HTMLAudioElement | null>(null);
   // Ref to track current phase for async operations like confetti
   const phaseRef = useRef<AppPhase>(AppPhase.LOCKED);
@@ -95,6 +96,7 @@ export default function App() {
   };
 
   const handleCandlesBlown = () => {
+    setHasBlownCandles(true); // Persist state so going back doesn't reset the game
     setPhase(AppPhase.MESSAGE);
   };
 
@@ -167,12 +169,17 @@ export default function App() {
              exit={{ opacity: 0 }}
              className="text-white text-2xl font-serif z-10"
            >
-             Unlocking Thoda sa KHAAS.....
+             Unlocking Thoda sa KHAAS ...
            </motion.div>
         )}
 
         {phase === AppPhase.CANDLE && (
-          <Cake key="cake" onCandlesBlown={handleCandlesBlown} name="बेनिशा" />
+          <Cake 
+            key="cake" 
+            onCandlesBlown={handleCandlesBlown} 
+            name="बेनिशा"
+            initialBlown={hasBlownCandles} 
+          />
         )}
 
         {phase === AppPhase.MESSAGE && (
